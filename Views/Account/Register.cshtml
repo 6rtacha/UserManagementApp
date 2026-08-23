@@ -1,0 +1,60 @@
+@model UserManagementApp.ViewModels.RegisterViewModel
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Sign Up";
+}
+
+<div class="d-flex flex-column align-items-center justify-content-center min-vh-100 px-3 py-4 bg-body-tertiary">
+    <div class="form-signin text-center">
+        <form asp-action="Register" method="post" novalidate>
+            @Html.AntiForgeryToken()
+
+            <!-- Welcome Header -->
+            <div class="mb-4">
+                <h1 class="h4 fw-bold text-dark mb-2">Welcome to User Management App</h1>
+                <p class="text-secondary mb-0">Please sign up</p>
+            </div>
+
+            <!-- SweetAlert2 Notifications -->
+            @if (!ViewData.ModelState.IsValid)
+            {
+                var errors = ViewData.ModelState.Values
+                    .SelectMany(v => v.Errors)
+                    .Select(e => e.ErrorMessage)
+                    .Where(e => !string.IsNullOrEmpty(e))
+                    .ToList();
+                var errorHtml = string.Join("<br>", errors);
+                <script>
+                    document.addEventListener("DOMContentLoaded", () => {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Registration Failed',
+                            html: '@Html.Raw(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(errorHtml))',
+                            confirmButtonColor: '#0d6efd'
+                        });
+                    });
+                </script>
+            }
+
+            <div class="form-floating">
+                <input asp-for="Name" type="text" class="form-control input-name @(!ViewData.ModelState.IsValid && ViewData.ModelState["Name"]?.Errors.Count > 0 ? "is-invalid" : "")" id="floatingName" placeholder="John Doe" autofocus autocomplete="name">
+                <label for="floatingName">Name</label>
+            </div>
+            <div class="form-floating">
+                <input asp-for="Email" type="email" class="form-control input-email @(!ViewData.ModelState.IsValid && ViewData.ModelState["Email"]?.Errors.Count > 0 ? "is-invalid" : "")" id="floatingInput" placeholder="name@example.com" autocomplete="email" required>
+                <label for="floatingInput">Email address</label>
+            </div>
+            <div class="form-floating">
+                <input asp-for="Password" type="password" class="form-control input-password @(!ViewData.ModelState.IsValid && ViewData.ModelState["Password"]?.Errors.Count > 0 ? "is-invalid" : "")" id="floatingPassword" placeholder="Password" autocomplete="new-password" required>
+                <label for="floatingPassword">Password</label>
+            </div>
+
+            <button class="btn btn-primary btn-submit w-100 py-2 mt-3" type="submit">Sign up</button>
+
+            <div class="mt-4 small text-center">
+                <span class="text-secondary">Already have an account?</span>
+                <a asp-controller="Account" asp-action="Login" class="text-decoration-none fw-semibold ms-1">Sign in</a>
+            </div>
+        </form>
+    </div>
+</div>

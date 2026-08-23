@@ -1,0 +1,241 @@
+@model IEnumerable<UserManagementApp.Models.User>
+@{
+    ViewData["Title"] = "User Management";
+}
+
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+<div class="container py-4">
+    @Html.AntiForgeryToken()
+
+    <!-- Toolbar -->
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-2 mb-3 p-2 bg-white border rounded-3 shadow-sm">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <button id="btnBlock" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1 fw-semibold px-3" title="Block selected users" disabled>
+                <i class="bi bi-lock-fill"></i> Block
+            </button>
+            
+            <button id="btnUnblock" class="btn btn-outline-secondary btn-sm" title="Unblock selected users" data-bs-toggle="tooltip" data-bs-placement="top" disabled>
+                <i class="bi bi-unlock-fill"></i>
+            </button>
+
+            <button id="btnDelete" class="btn btn-outline-danger btn-sm" title="Delete selected users" data-bs-toggle="tooltip" data-bs-placement="top" disabled>
+                <i class="bi bi-trash-fill"></i>
+            </button>
+
+            <button id="btnDeleteUnverified" class="btn btn-outline-warning btn-sm" title="Delete all unverified users" data-bs-toggle="tooltip" data-bs-placement="top">
+                <i class="bi bi-person-x-fill text-dark"></i>
+            </button>
+        </div>
+
+        <div>
+            <input type="text" id="filterInput" class="form-control form-control-sm px-3 rounded-3 w-100" placeholder="Filter" style="min-width: 180px;">
+        </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="table-responsive border rounded-3 bg-white shadow-sm">
+        <table class="table table-hover align-middle mb-0" id="usersTable">
+            <thead class="table-light border-bottom">
+                <tr>
+                    <th style="width: 45px;" class="text-center">
+                        <input class="form-check-input" type="checkbox" id="selectAllCheckbox">
+                    </th>
+                    <th class="text-secondary fw-semibold small text-uppercase">Name</th>
+                    <th class="text-secondary fw-semibold small text-uppercase">
+                        Email <i class="bi bi-arrow-down small text-muted"></i>
+                    </th>
+                    <th class="text-secondary fw-semibold small text-uppercase">Status</th>
+                    <th class="text-secondary fw-semibold small text-uppercase">Last seen</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var user in Model)
+                {
+                    <tr id="row-@user.Id" class="@(user.Status == UserManagementApp.Models.UserStatus.Blocked ? "table-light text-muted" : "")">
+                        <td class="text-center">
+                            <input class="form-check-input user-checkbox" type="checkbox" value="@user.Id">
+                        </td>
+                        <td class="fw-semibold name-cell">
+                            <span class="@(user.Status == UserManagementApp.Models.UserStatus.Blocked ? "text-muted" : "text-dark")">@user.Name</span>
+                        </td>
+                        <td class="email-cell text-secondary">@user.Email</td>
+                        <td>
+                            @if (user.Status == UserManagementApp.Models.UserStatus.Active)
+                            {
+                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">Active</span>
+                            }
+                            else if (user.Status == UserManagementApp.Models.UserStatus.Blocked)
+                            {
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">Blocked</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1">Unverified</span>
+                            }
+                        </td>
+                        <td class="text-secondary small">
+                            <span data-bs-toggle="tooltip" data-bs-placement="top" title="@user.LastLoginAt.ToString("MMMM dd, yyyy HH:mm:ss") UTC" style="cursor: default;">
+                                @GetRelativeTime(user.LastLoginAt)
+                            </span>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@functions {
+    // Format relative time ("less than a minute ago", "5 minutes ago", etc.)
+    public static string GetRelativeTime(DateTime dateTime)
+    {
+        var span = DateTime.UtcNow - dateTime;
+        if (span.TotalMinutes < 1) return "less than a minute ago";
+        if (span.TotalMinutes < 60) return $"{(int)span.TotalMinutes} minutes ago";
+        if (span.TotalHours < 24) return $"{(int)span.TotalHours} hours ago";
+        if (span.TotalDays < 30) return $"{(int)span.TotalDays} days ago";
+        return dateTime.ToString("MMM dd, yyyy");
+    }
+}
+
+@section Scripts {
+    <script>
+        // Initialize tooltips
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(el => new bootstrap.Tooltip(el));
+
+        // DOM elements
+        const selectAll = document.getElementById('selectAllCheckbox');
+        const userCheckboxes = document.querySelectorAll('.user-checkbox');
+        const btnBlock = document.getElementById('btnBlock');
+        const btnUnblock = document.getElementById('btnUnblock');
+        const btnDelete = document.getElementById('btnDelete');
+        const btnDeleteUnverified = document.getElementById('btnDeleteUnverified');
+        const filterInput = document.getElementById('filterInput');
+
+        // Show SweetAlert messages
+        function showMessage(msg, isError = false) {
+            Swal.fire({
+                icon: isError ? 'error' : 'success',
+                title: isError ? 'Error' : 'Success',
+                text: msg,
+                timer: isError ? undefined : 2500,
+                timerProgressBar: !isError,
+                confirmButtonColor: isError ? '#dc3545' : '#0d6efd'
+            });
+        }
+
+        // Get visible checkboxes based on filter
+        function getVisibleCheckboxes() {
+            return Array.from(userCheckboxes).filter(cb => cb.closest('tr').style.display !== 'none');
+        }
+
+        // Update toolbar button states and select-all checkbox
+        function updateToolbar() {
+            const checkedCount = document.querySelectorAll('.user-checkbox:checked').length;
+            const hasSelection = checkedCount > 0;
+            
+            btnBlock.disabled = !hasSelection;
+            btnUnblock.disabled = !hasSelection;
+            btnDelete.disabled = !hasSelection;
+
+            if (selectAll) {
+                const visibleCheckboxes = getVisibleCheckboxes();
+                if (visibleCheckboxes.length > 0) {
+                    const visibleCheckedCount = visibleCheckboxes.filter(cb => cb.checked).length;
+                    selectAll.checked = visibleCheckedCount === visibleCheckboxes.length;
+                    selectAll.indeterminate = visibleCheckedCount > 0 && visibleCheckedCount < visibleCheckboxes.length;
+                } else {
+                    selectAll.checked = false;
+                    selectAll.indeterminate = false;
+                }
+            }
+        }
+
+        // Master checkbox event listener
+        if (selectAll) {
+            selectAll.addEventListener('change', () => {
+                const visibleCheckboxes = getVisibleCheckboxes();
+                visibleCheckboxes.forEach(cb => {
+                    cb.checked = selectAll.checked;
+                });
+                updateToolbar();
+            });
+        }
+
+        userCheckboxes.forEach(cb => cb.addEventListener('change', updateToolbar));
+
+        // Get selected user IDs
+        function getSelectedIds() {
+            return Array.from(document.querySelectorAll('.user-checkbox:checked')).map(cb => parseInt(cb.value));
+        }
+
+        // Send AJAX requests to controller endpoints
+        async function sendAction(url, data = null) {
+            try {
+                const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'RequestVerificationToken': token
+                    },
+                    body: data ? JSON.stringify(data) : null
+                });
+
+                // Requirement: If the current user is blocked/deleted, redirect immediately to login
+                if (response.status === 401 || response.redirected) {
+                    window.location.href = '/Account/Login?blocked=true';
+                    return;
+                }
+
+                let resData = null;
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    try {
+                        resData = await response.json();
+                    } catch (e) {
+                        console.warn('Could not parse JSON response:', e);
+                    }
+                }
+
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    const errorMsg = resData?.message || `Server error (${response.status}: ${response.statusText || 'Request failed'})`;
+                    showMessage(errorMsg, true);
+                }
+            } catch (err) {
+                console.error('AJAX error:', err);
+                showMessage('Unable to connect to server. Please check your network connection.', true);
+            }
+        }
+
+        // Toolbar action buttons
+        btnBlock.addEventListener('click', () => sendAction('/Users/Block', getSelectedIds()));
+        btnUnblock.addEventListener('click', () => sendAction('/Users/Unblock', getSelectedIds()));
+        btnDelete.addEventListener('click', () => sendAction('/Users/Delete', getSelectedIds()));
+        btnDeleteUnverified.addEventListener('click', () => sendAction('/Users/DeleteUnverified'));
+
+        // Client-side search and filtering
+        filterInput.addEventListener('keyup', () => {
+            const term = filterInput.value.toLowerCase();
+            document.querySelectorAll('#usersTable tbody tr').forEach(row => {
+                const name = row.querySelector('.name-cell')?.textContent.toLowerCase() || '';
+                const email = row.querySelector('.email-cell')?.textContent.toLowerCase() || '';
+                if (name.includes(term) || email.includes(term)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                    const cb = row.querySelector('.user-checkbox');
+                    if (cb) cb.checked = false;
+                }
+            });
+            updateToolbar();
+        });
+    </script>
+}
