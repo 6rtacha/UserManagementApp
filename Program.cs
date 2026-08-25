@@ -9,8 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add MVC Controllers and Razor Views
 builder.Services.AddControllersWithViews();
 
-// Register Email Service (Gmail SMTP)
-builder.Services.AddScoped<IEmailService, GmailSmtpEmailService>();  
+builder.Services.AddHttpClient<IEmailService, BrevoEmailService>();  
 
 // Configure Antiforgery (CSRF protection for AJAX header)
 builder.Services.AddAntiforgery(options =>
