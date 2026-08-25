@@ -170,7 +170,25 @@ public class AccountController : Controller
         user.VerificationToken = null;
         await _context.SaveChangesAsync();
 
-        TempData["SuccessMessage"] = "Your email has been verified! You can now sign in.";
-        return RedirectToAction("Login");
+        // If the user was blocked while unverified, do not log in; redirect to Login with notice
+        if (user.Status == UserStatus.Blocked)
+        {
+            TempData["ErrorMessage"] = "Your email has been verified, but your account is currently blocked.";
+            return RedirectToAction("Login");
+        }
+
+        // Automatically sign in the user and redirect to Users Dashboard
+        var claims = new List<Claim>
+        {
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new Claim(ClaimTypes.Name, user.Name),
+            new Claim(ClaimTypes.Email, user.Email)
+        };
+
+        var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(claimsIdentity));
+
+        TempData["SuccessMessage"] = "Your email has been verified successfully! Welcome!";
+        return RedirectToAction("Index", "Users");
     }
 }
